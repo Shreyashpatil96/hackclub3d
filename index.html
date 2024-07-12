@@ -1,0 +1,153 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>3D Space Website</title>
+    <style>
+        body { margin: 0; overflow: hidden; }
+        canvas { display: block; }
+        #info {
+            position: absolute;
+            top: 10px;
+            width: 100%;
+            text-align: center;
+            color: white;
+            font-family: Arial, sans-serif;
+            font-size: 18px;
+        }
+    </style>
+</head>
+<body>
+    <div id="info">Welcome to Space Explorer</div>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script>
+        let scene, camera, renderer, planet, satellites = [], asteroids = [];
+
+        function init() {
+            scene = new THREE.Scene();
+            camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+            renderer = new THREE.WebGLRenderer({ antialias: true });
+            renderer.setSize(window.innerWidth, window.innerHeight);
+            document.body.appendChild(renderer.domElement);
+
+            // Add stars background
+            const starsGeometry = new THREE.BufferGeometry();
+            const starsMaterial = new THREE.PointsMaterial({color: 0xFFFFFF, size: 0.1});
+            const starsVertices = [];
+            for (let i = 0; i < 10000; i++) {
+                const x = THREE.MathUtils.randFloatSpread(2000);
+                const y = THREE.MathUtils.randFloatSpread(2000);
+                const z = THREE.MathUtils.randFloatSpread(2000);
+                starsVertices.push(x, y, z);
+            }
+            starsGeometry.setAttribute('position', new THREE.Float32BufferAttribute(starsVertices, 3));
+            const starField = new THREE.Points(starsGeometry, starsMaterial);
+            scene.add(starField);
+
+            // Create planet
+            const planetGeometry = new THREE.SphereGeometry(5, 32, 32);
+            const planetMaterial = new THREE.MeshPhongMaterial({
+                map: new THREE.TextureLoader().load('https://raw.githubusercontent.com/mrdoob/three.js/master/examples/textures/planets/earth_atmos_2048.jpg'),
+                bumpMap: new THREE.TextureLoader().load('https://raw.githubusercontent.com/mrdoob/three.js/master/examples/textures/planets/earth_normal_2048.jpg'),
+                bumpScale: 0.05,
+            });
+            planet = new THREE.Mesh(planetGeometry, planetMaterial);
+            scene.add(planet);
+
+            // Create satellites
+            for (let i = 0; i < 5; i++) {
+                createSatellite();
+            }
+
+            // Create asteroids
+            for (let i = 0; i < 50; i++) {
+                createAsteroid();
+            }
+
+            // Add lights
+            const ambientLight = new THREE.AmbientLight(0x404040);
+            scene.add(ambientLight);
+            const pointLight = new THREE.PointLight(0xffffff, 1, 100);
+            pointLight.position.set(10, 10, 10);
+            scene.add(pointLight);
+
+            camera.position.z = 20;
+
+            animate();
+        }
+
+        function createSatellite() {
+            const satelliteGeometry = new THREE.BoxGeometry(0.5, 0.5, 1.5);
+            const satelliteMaterial = new THREE.MeshPhongMaterial({color: 0xcccccc});
+            const satellite = new THREE.Mesh(satelliteGeometry, satelliteMaterial);
+            
+            const orbitRadius = Math.random() * 5 + 7;
+            const orbitAngle = Math.random() * Math.PI * 2;
+            satellite.position.set(
+                Math.cos(orbitAngle) * orbitRadius,
+                Math.sin(orbitAngle) * orbitRadius,
+                0
+            );
+            
+            scene.add(satellite);
+            satellites.push({mesh: satellite, orbit: orbitRadius, angle: orbitAngle, speed: Math.random() * 0.02 + 0.01});
+        }
+
+        function createAsteroid() {
+            const asteroidGeometry = new THREE.SphereGeometry(Math.random() * 0.3 + 0.1, 8, 8);
+            const asteroidMaterial = new THREE.MeshPhongMaterial({color: 0x888888});
+            const asteroid = new THREE.Mesh(asteroidGeometry, asteroidMaterial);
+            
+            const distance = Math.random() * 50 + 20;
+            const theta = Math.random() * Math.PI * 2;
+            const phi = Math.random() * Math.PI;
+            
+            asteroid.position.setFromSpherical(new THREE.Spherical(distance, phi, theta));
+            
+            scene.add(asteroid);
+            asteroids.push({
+                mesh: asteroid,
+                rotationSpeed: Math.random() * 0.05 + 0.01,
+                orbitSpeed: Math.random() * 0.002 + 0.001
+            });
+        }
+
+        function animate() {
+            requestAnimationFrame(animate);
+
+            // Rotate planet
+            planet.rotation.y += 0.005;
+
+            // Animate satellites
+            satellites.forEach(sat => {
+                sat.angle += sat.speed;
+                sat.mesh.position.x = Math.cos(sat.angle) * sat.orbit;
+                sat.mesh.position.y = Math.sin(sat.angle) * sat.orbit;
+                sat.mesh.rotation.z += 0.01;
+            });
+
+            // Animate asteroids
+            asteroids.forEach(asteroid => {
+                asteroid.mesh.rotation.x += asteroid.rotationSpeed;
+                asteroid.mesh.rotation.y += asteroid.rotationSpeed;
+
+                const spherical = new THREE.Spherical().setFromVector3(asteroid.mesh.position);
+                spherical.theta += asteroid.orbitSpeed;
+                asteroid.mesh.position.setFromSpherical(spherical);
+            });
+
+            renderer.render(scene, camera);
+        }
+
+        init();
+
+        // Handle window resizing
+        window.addEventListener('resize', () => {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        });
+    </script>
+</body>
+</html>
